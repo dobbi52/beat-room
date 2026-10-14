@@ -162,7 +162,8 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .gift .g-closed{width:112px;bottom:32px;margin-left:-56px;transform-origin:50% 100%}
 .gift .g-open{width:111px;bottom:32px;margin-left:-55px;opacity:0;transform-origin:50% 100%}
 .gift .g-lid{width:116px;bottom:84px;margin-left:-58px;opacity:0}
-.gift .g-pet{width:80px;bottom:58px;margin-left:-40px;opacity:0;transform-origin:50% 100%}
+.gift .g-pet{width:84px;bottom:6px;margin-left:-42px;opacity:0;transform-origin:50% 100%;z-index:1}
+.gift .g-open{z-index:2}.gift .g-lid{z-index:3}.gift .sparks{position:absolute;inset:0;z-index:5;pointer-events:none}
 .gift p{position:absolute;left:0;right:0;bottom:6px;margin:0;text-align:center;font-family:var(--display);font-size:13px;color:var(--ink-soft);transition:opacity .2s}
 .gift .glow,.gift .rays,.gift .flash{position:absolute;pointer-events:none;opacity:0}
 .gift .glow{inset:0;transition:opacity .4s}
@@ -184,7 +185,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .gift.open .flash{animation:gFlash .4s ease-out}
 .gift.open p{opacity:0}
 .gift.open .rays{opacity:1}
-.gift.pet .g-pet{animation:gPet .55s cubic-bezier(.25,1.5,.5,1) forwards}
+.gift.pet .g-pet{animation:gPet .75s ease-out forwards}.gift.pet .g-open{animation:gBack .5s ease-out forwards}
 .gift .sparks i{position:absolute;left:50%;bottom:90px;width:7px;height:7px;margin-left:-3px;background:#FFF6C8;box-shadow:0 0 0 2px rgba(255,210,90,.6);opacity:0}
 .gift.g1 .sparks i{background:#DDF3FF;box-shadow:0 0 0 2px rgba(62,160,200,.6)}
 .gift.g2 .sparks i{background:#FFE07A;box-shadow:0 0 0 2px rgba(232,71,90,.5)}
@@ -196,7 +197,8 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 @keyframes gPop{0%{transform:scale(1.25,.8)}100%{transform:scale(1)}}
 @keyframes gLid{0%{opacity:1;transform:translate(0,0) rotate(0)}60%{opacity:1}100%{opacity:0;transform:translate(46px,-90px) rotate(38deg)}}
 @keyframes gFlash{0%{opacity:.95}100%{opacity:0}}
-@keyframes gPet{0%{opacity:0;transform:translateY(40px) scale(.3)}100%{opacity:1;transform:translateY(-20px) scale(1)}}
+@keyframes gPet{0%{opacity:0;z-index:1;transform:translate(0,-36px) scale(.7)}15%{opacity:1}45%{z-index:1;transform:translate(12px,-50px) scale(.92)}46%{z-index:4}78%{transform:translate(34px,0) scale(1.06,.86)}90%{transform:translate(34px,-6px) scale(.97,1.03)}100%{opacity:1;z-index:4;transform:translate(34px,0) scale(1)}}
+@keyframes gBack{to{transform:translateX(-34px) scale(.9)}}
 @keyframes gSpark{0%{opacity:1;transform:translate(0,0) scale(1.2)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.4)}}
 @media (prefers-reduced-motion:reduce){.gift *{animation:none!important}}
 .dex{display:flex;flex-direction:column;gap:8px}
