@@ -462,12 +462,12 @@ function finishRound(){
   const stars=ratio>=0.92?3:ratio>=0.75?2:ratio>=0.5?1:0;
   const prevBest=save.best[stageIdx][roundIdx],newStars=Math.max(0,stars-prevBest);
   const nP=notes.filter(e=>e.res==='perfect').length,nG=notes.filter(e=>e.res==='good').length;
-  const mult=stageIdx+1,coinGain=(stars*8+nP*2+nG)*mult+newStars*15;save.coins+=coinGain;
+  const mult=stageIdx+1,replay=!!save.pass[stageIdx][roundIdx],base=(stars*8+nP*2+nG)*mult,coinGain=(replay?Math.ceil(base/2):base)+newStars*15;save.coins+=coinGain;
   const nMiss=notes.filter(e=>e.res==='miss').length,nBroke=rests.filter(e=>e.res==='broke').length;
   const pass=nMiss===0&&nBroke===0&&run.extra===0&&(!strict(stageIdx)||nG===0);
   if(pass)save.pass[stageIdx][roundIdx]=true;
   save.best[stageIdx][roundIdx]=Math.max(prevBest,stars);persist();
-  lastResult={stars,perfect:notes.filter(e=>e.res==='perfect').length,good:notes.filter(e=>e.res==='good').length,miss:notes.filter(e=>e.res==='miss'&&!e.short).length,short:notes.filter(e=>e.short).length,notes:notes.length,keep:rests.filter(e=>e.res==='keep').length,rests:rests.length,broke:nBroke,extra:run.extra,pass,strict:strict(stageIdx),coins:coinGain,mult,newStars,canBuy:save.coins>=GACHA_COST};
+  lastResult={replay,stars,perfect:notes.filter(e=>e.res==='perfect').length,good:notes.filter(e=>e.res==='good').length,miss:notes.filter(e=>e.res==='miss'&&!e.short).length,short:notes.filter(e=>e.short).length,notes:notes.length,keep:rests.filter(e=>e.res==='keep').length,rests:rests.length,broke:nBroke,extra:run.extra,pass,strict:strict(stageIdx),coins:coinGain,mult,newStars,canBuy:save.coins>=GACHA_COST};
   if(stars>=2&&has('confetti'))confettiFx();
   if(stars>0)chime(ac.currentTime+0.05,stars===3?660:523);
   state='result';document.getElementById('callout').innerHTML='';document.getElementById('phase').textContent='결과';
@@ -512,7 +512,7 @@ function renderPlay(){
     const total=r.notes;
     const why=[r.miss?'놓침 '+r.miss:'',r.short?'짧음 '+r.short:'',r.broke?'쉼표 '+r.broke:'',r.extra?'헛박 '+r.extra:'',r.strict&&r.good?'좋아요 '+r.good:''].filter(Boolean);
     const hit=r.perfect+r.good;
-    panel.innerHTML=`<div class="result compact"><div class="rtop"><span class="stars">${'★'.repeat(r.stars)}<i>${'★'.repeat(3-r.stars)}</i></span><h3>${msg}</h3></div><p class="sum">${why.length?`${hit}/${total} 맞힘 · <b class="bad">${why.join(' · ')}</b>`:`${total}/${total} 모두 맞힘!`}</p><div class="coinline"><canvas width="8" height="8" data-icon="coin"></canvas>+${r.coins}${r.mult>1?` <span class="cat">×${r.mult}</span>`:''}${save.coins>=GACHA_COST?` <span class="cat ok2">뽑기 ${Math.floor(save.coins/GACHA_COST)}번 가능</span>`:''}</div></div><div class="rowres">${r.pass?`<button class="tap go" id="nextBtn">${last?(stageIdx<STAGES.length-1?'다음 단계':'처음으로'):'다음 리듬'}<small>${last?'단계 완료!':'리듬 '+(roundIdx+2)+'/'+st.rounds.length}</small></button>`:''}<button class="btn" id="againBtn">다시 하기</button><button class="btn" id="homeBtn">단계 선택</button></div>`;
+    panel.innerHTML=`<div class="result compact"><div class="rtop"><span class="stars">${'★'.repeat(r.stars)}<i>${'★'.repeat(3-r.stars)}</i></span><h3>${msg}</h3></div><p class="sum">${why.length?`${hit}/${total} 맞힘 · <b class="bad">${why.join(' · ')}</b>`:`${total}/${total} 모두 맞힘!`}</p><div class="coinline"><canvas width="8" height="8" data-icon="coin"></canvas>+${r.coins}${r.mult>1?` <span class="cat">×${r.mult}</span>`:''}${r.replay?` <span class="cat">다시 ½</span>`:''}${save.coins>=GACHA_COST?` <span class="cat ok2">뽑기 ${Math.floor(save.coins/GACHA_COST)}번 가능</span>`:''}</div></div><div class="rowres">${r.pass?`<button class="tap go" id="nextBtn">${last?(stageIdx<STAGES.length-1?'다음 단계':'처음으로'):'다음 리듬'}<small>${last?'단계 완료!':'리듬 '+(roundIdx+2)+'/'+st.rounds.length}</small></button>`:''}<button class="btn" id="againBtn">다시 하기</button><button class="btn" id="homeBtn">단계 선택</button></div>`;
     panel.querySelectorAll('[data-icon]').forEach(cv=>iconCanvas(cv,cv.dataset.icon));
     const nb=panel.querySelector('#nextBtn');
     if(nb)nb.onclick=()=>{if(!last)roundIdx++;else{stageIdx=stageIdx<STAGES.length-1?stageIdx+1:0;roundIdx=0;}state='ready';updateTop();renderPlay();};
