@@ -9,6 +9,7 @@ var HUB_API = 'https://script.google.com/macros/s/AKfycbzZlmUD9M4rfo4Y4eEYgNjZH0
 var SHEET = '기록';
 var HEAD = ['닉네임', '저장 시각', '별', '통과 리듬', '코인', '모은 친구', '무한 마디', '무한 점수', '데이터'];
 var MAX_DATA = 45000;
+var MIN_VER = 2;   // 이보다 옛날 게임 화면에서 온 요청은 받지 않아요(새로고침 안내)
 
 function doGet() { return out({ ok: true, msg: '숲속 박자 음악회 서버가 켜져 있어요.' }); }
 
@@ -16,6 +17,7 @@ function doPost(e) {
   try {
     var b = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (b.action === 'rank') return out(rank());
+    if ((+b.ver || 0) < MIN_VER) return out({ ok: false, code: 'OLD', error: '게임이 바뀌었어요. 새로고침해 주세요.' });
     var who = verify(b.nick, b.pin);
     if (!who.ok) return out(who);
     if (b.action === 'load') return out(load(who.nick));
@@ -183,5 +185,51 @@ function 코인정리() {
     rng.setValues(v);
     props.setProperty('cleanup-2026-10-15', String(now));
     Logger.log('정리 끝: ' + v.length + '명 코인 0, 동물 반 지운 학생 ' + trimmed + '명');
+  } finally { lock.releaseLock(); }
+}
+
+/* ============================================================
+   한 번만 실행: 추가 정리 (2026-10-15 오후)
+   함수 목록에서 '추가정리'를 고르고 ▶ 실행.
+   · 아래 학생들만: 오전 정리 뒤에 늘어난 뽑기를 취소(정리 직후 동물로 되돌림)하고,
+     코인 0, 무한 음표 기록 0으로 해요. 별·통과 기록은 그대로예요.
+   · 바꾸기 전 '기록' 시트를 '백업2 …'로 복사해 둬요.
+   ============================================================ */
+var 추가정리_명단 = ['우아', '진콩', '박씨', '대한민국에사는사', '프리티맨', '바노노', '금산파랑', '5학년', '6짱', '권유성', '권도윤1'];
+
+function 추가정리() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('cleanup2-2026-10-15')) { Logger.log('이미 추가 정리했어요. 다시 하지 않아요.'); return; }
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = sheet();
+    var bk = ss.getSheets().filter(function (x) { return /^백업 1015/.test(x.getName()); })[0];
+    var base = {};
+    if (bk && bk.getLastRow() > 1) bk.getRange(2, 1, bk.getLastRow() - 1, 9).getValues().forEach(function (r) {
+      var d = null; try { d = JSON.parse(r[8]); } catch (e) {}
+      if (d) { trimDex(d); base[String(r[0])] = d.dex || {}; }
+    });
+    sh.copyTo(ss).setName('백업2 ' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MMdd HHmm'));
+    var n = sh.getLastRow(), rng = sh.getRange(2, 1, n - 1, HEAD.length), v = rng.getValues(), now = Date.now(), done = [];
+    for (var r = 0; r < v.length; r++) {
+      var nick = String(v[r][0]);
+      if (추가정리_명단.indexOf(nick) < 0) continue;
+      var d = null; try { d = JSON.parse(v[r][8]); } catch (e) {}
+      if (!d) continue;
+      var before = 0; for (var k in d.dex) before += d.dex[k];
+      var want = (d.stage || []).length;
+      d.dex = JSON.parse(JSON.stringify(base[nick] || {}));
+      var st = (d.stage || []).filter(function (id) { return d.dex[id] > 0; });
+      Object.keys(d.dex).sort(function (a, b) { return (TIER_OF[b] || 0) - (TIER_OF[a] || 0); })
+        .forEach(function (id) { if (st.length < want && st.indexOf(+id) < 0 && st.indexOf(id) < 0) st.push(+id); });
+      d.stage = st;
+      d.coins = 0; d.infBest = { bars: 0, score: 0 }; d.rev = (d.rev || 0) + 1; d.t = now; d.v = 2;
+      var after = 0, kinds = 0; for (var k2 in d.dex) { after += d.dex[k2]; if (d.dex[k2] > 0) kinds++; }
+      v[r][4] = 0; v[r][5] = kinds; v[r][6] = 0; v[r][7] = 0; v[r][8] = JSON.stringify(d);
+      done.push(nick + ' 뽑기 ' + before + '→' + after);
+    }
+    rng.setValues(v);
+    props.setProperty('cleanup2-2026-10-15', String(now));
+    Logger.log('추가 정리 ' + done.length + '명: ' + done.join(', '));
   } finally { lock.releaseLock(); }
 }
