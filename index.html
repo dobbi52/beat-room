@@ -313,9 +313,9 @@ function parse(str){let pos=0;const ev=[];str.split('|').forEach(bar=>bar.trim()
 
 /* ---------- save ---------- */
 const KEY='beat-room-v3';
-const DEF_SAVE=()=>({best:STAGES.map(s=>s.rounds.map(()=>0)),metro:true,sound:true,coins:50,owned:[],off:[],listen:true,preview:false,dex:{},stage:[],infBest:{bars:0,score:0},pass:STAGES.map(s=>s.rounds.map(()=>false)),t:0});
+const DEF_SAVE=()=>({best:STAGES.map(s=>s.rounds.map(()=>0)),metro:true,sound:true,coins:50,owned:[],off:[],listen:true,preview:false,dex:{},stage:[],infBest:{bars:0,score:0},pass:STAGES.map(s=>s.rounds.map(()=>false)),t:0,rev:0});
 let save=DEF_SAVE();
-function applySave(s){save=DEF_SAVE();try{if(s&&s.best){STAGES.forEach((st,i)=>st.rounds.forEach((_,j)=>{save.best[i][j]=(s.best[i]&&s.best[i][j])||0;}));save.metro=s.metro!==false;save.sound=s.sound!==false;save.listen=s.listen!==false;if(s.dex&&typeof s.dex==='object')save.dex=s.dex;if(Array.isArray(s.stage))save.stage=s.stage.slice(0,2);if(s.infBest)save.infBest={bars:s.infBest.bars||0,score:s.infBest.score||0};STAGES.forEach((st,i)=>st.rounds.forEach((_,j)=>{save.pass[i][j]=s.pass?!!(s.pass[i]&&s.pass[i][j]):save.best[i][j]>0;}));if(typeof s.coins==='number')save.coins=s.coins;if(Array.isArray(s.owned))save.owned=s.owned.filter(id=>ITEMS.some(it=>it.id===id));if(Array.isArray(s.off))save.off=s.off;if(typeof s.t==='number')save.t=s.t;}}catch(e){}}
+function applySave(s){save=DEF_SAVE();try{if(s&&s.best){STAGES.forEach((st,i)=>st.rounds.forEach((_,j)=>{save.best[i][j]=(s.best[i]&&s.best[i][j])||0;}));save.metro=s.metro!==false;save.sound=s.sound!==false;save.listen=s.listen!==false;if(s.dex&&typeof s.dex==='object')save.dex=s.dex;if(Array.isArray(s.stage))save.stage=s.stage.slice(0,2);if(s.infBest)save.infBest={bars:s.infBest.bars||0,score:s.infBest.score||0};STAGES.forEach((st,i)=>st.rounds.forEach((_,j)=>{save.pass[i][j]=s.pass?!!(s.pass[i]&&s.pass[i][j]):save.best[i][j]>0;}));if(typeof s.coins==='number')save.coins=s.coins;if(Array.isArray(s.owned))save.owned=s.owned.filter(id=>ITEMS.some(it=>it.id===id));if(Array.isArray(s.off))save.off=s.off;if(typeof s.t==='number')save.t=s.t;if(typeof s.rev==='number')save.rev=s.rev;}}catch(e){}}
 const AA=window.ArcadeAuth||null;   /* 생각 오락실 통합 계정 */
 const SAVE_API='https://script.google.com/macros/s/AKfycbywz-f8Xxn2GoIQ8u1bvdREL6tgUbwM_8t9NQ0Bv6Kx4f_KOYCFdekQlBLgcg0qtSCQ/exec';                   /* 기록 저장 서버(Apps Script 웹 앱 주소) */
 let me=null,dirty=false,pushT=0,sync='';
@@ -324,9 +324,9 @@ if(!AA){try{applySave(JSON.parse(localStorage.getItem(KEY)||'null')||(()=>{const
 function persist(){save.t=Date.now();try{localStorage.setItem(me?ukey(me.nick):KEY,JSON.stringify(save));}catch(e){}if(me&&SAVE_API){dirty=true;clearTimeout(pushT);pushT=setTimeout(push,1500);}}
 function api(body,keep){return fetch(SAVE_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),keepalive:!!keep}).then(r=>r.json());}
 function push(keep){if(!me||!SAVE_API||!dirty)return;dirty=false;clearTimeout(pushT);const who=me;setSync('save');
-  api({action:'save',nick:who.nick,pin:who.pin,data:save},keep).then(j=>{if(me!==who)return;if(j.ok)setSync(dirty?'save':'ok');else{dirty=true;if(['PIN','NOUSER','BLOCKED'].includes(j.code)&&AA)AA.logout();else setSync('off');}}).catch(()=>{if(me===who){dirty=true;setSync('off');}});}
+  api({action:'save',nick:who.nick,pin:who.pin,data:save},keep).then(j=>{if(me!==who)return;if(j.ok)setSync(dirty?'save':'ok');else if(j.code==='REV'&&j.data){dirty=false;takeServer(j.data);}else{dirty=true;if(['PIN','NOUSER','BLOCKED'].includes(j.code)&&AA)AA.logout();else setSync('off');}}).catch(()=>{if(me===who){dirty=true;setSync('off');}});}
 addEventListener('pagehide',()=>push(true));
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')push(true);});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(state==='inf'&&inf&&!inf.over)infEnd();push(true);}});
 setInterval(()=>{if(dirty&&sync==='off')push();},20000);
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SYNC_TXT={load:'기록 불러오는 중…',save:'저장하는 중…',ok:'기록 저장됨 ✓',off:'서버 연결 안 됨 · 이 기기에 저장 중'};
@@ -462,12 +462,13 @@ function finishRound(){
   const stars=ratio>=0.92?3:ratio>=0.75?2:ratio>=0.5?1:0;
   const prevBest=save.best[stageIdx][roundIdx],newStars=Math.max(0,stars-prevBest);
   const nP=notes.filter(e=>e.res==='perfect').length,nG=notes.filter(e=>e.res==='good').length;
-  const mult=stageIdx+1,replay=!!save.pass[stageIdx][roundIdx],base=(stars*8+nP*2+nG)*mult,coinGain=(replay?Math.ceil(base/2):base)+newStars*15;save.coins+=coinGain;
+  const replay=!!save.pass[stageIdx][roundIdx];
   const nMiss=notes.filter(e=>e.res==='miss').length,nBroke=rests.filter(e=>e.res==='broke').length;
   const pass=nMiss===0&&nBroke===0&&run.extra===0&&(!strict(stageIdx)||nG===0);
+  const first=pass&&!replay,coinGain=(first?30+(stageIdx+1)*10:pass?5:stars)+newStars*10;save.coins+=coinGain;
   if(pass)save.pass[stageIdx][roundIdx]=true;
   save.best[stageIdx][roundIdx]=Math.max(prevBest,stars);persist();
-  lastResult={replay,stars,perfect:notes.filter(e=>e.res==='perfect').length,good:notes.filter(e=>e.res==='good').length,miss:notes.filter(e=>e.res==='miss'&&!e.short).length,short:notes.filter(e=>e.short).length,notes:notes.length,keep:rests.filter(e=>e.res==='keep').length,rests:rests.length,broke:nBroke,extra:run.extra,pass,strict:strict(stageIdx),coins:coinGain,mult,newStars,canBuy:save.coins>=GACHA_COST};
+  lastResult={replay,stars,perfect:notes.filter(e=>e.res==='perfect').length,good:notes.filter(e=>e.res==='good').length,miss:notes.filter(e=>e.res==='miss'&&!e.short).length,short:notes.filter(e=>e.short).length,notes:notes.length,keep:rests.filter(e=>e.res==='keep').length,rests:rests.length,broke:nBroke,extra:run.extra,pass,strict:strict(stageIdx),coins:coinGain,first,newStars,canBuy:save.coins>=GACHA_COST};
   if(stars>=2&&has('confetti'))confettiFx();
   if(stars>0)chime(ac.currentTime+0.05,stars===3?660:523);
   state='result';document.getElementById('callout').innerHTML='';document.getElementById('phase').textContent='결과';
@@ -512,7 +513,7 @@ function renderPlay(){
     const total=r.notes;
     const why=[r.miss?'놓침 '+r.miss:'',r.short?'짧음 '+r.short:'',r.broke?'쉼표 '+r.broke:'',r.extra?'헛박 '+r.extra:'',r.strict&&r.good?'좋아요 '+r.good:''].filter(Boolean);
     const hit=r.perfect+r.good;
-    panel.innerHTML=`<div class="result compact"><div class="rtop"><span class="stars">${'★'.repeat(r.stars)}<i>${'★'.repeat(3-r.stars)}</i></span><h3>${msg}</h3></div><p class="sum">${why.length?`${hit}/${total} 맞힘 · <b class="bad">${why.join(' · ')}</b>`:`${total}/${total} 모두 맞힘!`}</p><div class="coinline"><canvas width="8" height="8" data-icon="coin"></canvas>+${r.coins}${r.mult>1?` <span class="cat">×${r.mult}</span>`:''}${r.replay?` <span class="cat">다시 ½</span>`:''}${save.coins>=GACHA_COST?` <span class="cat ok2">뽑기 ${Math.floor(save.coins/GACHA_COST)}번 가능</span>`:''}</div></div><div class="rowres">${r.pass?`<button class="tap go" id="nextBtn">${last?(stageIdx<STAGES.length-1?'다음 단계':'처음으로'):'다음 리듬'}<small>${last?'단계 완료!':'리듬 '+(roundIdx+2)+'/'+st.rounds.length}</small></button>`:''}<button class="btn" id="againBtn">다시 하기</button><button class="btn" id="homeBtn">단계 선택</button></div>`;
+    panel.innerHTML=`<div class="result compact"><div class="rtop"><span class="stars">${'★'.repeat(r.stars)}<i>${'★'.repeat(3-r.stars)}</i></span><h3>${msg}</h3></div><p class="sum">${why.length?`${hit}/${total} 맞힘 · <b class="bad">${why.join(' · ')}</b>`:`${total}/${total} 모두 맞힘!`}</p><div class="coinline"><canvas width="8" height="8" data-icon="coin"></canvas>+${r.coins}${r.first?` <span class="cat">첫 통과</span>`:''}${r.newStars?` <span class="cat">새 별 ${r.newStars}</span>`:''}${save.coins>=GACHA_COST?` <span class="cat ok2">뽑기 ${Math.floor(save.coins/GACHA_COST)}번 가능</span>`:''}</div></div><div class="rowres">${r.pass?`<button class="tap go" id="nextBtn">${last?(stageIdx<STAGES.length-1?'다음 단계':'처음으로'):'다음 리듬'}<small>${last?'단계 완료!':'리듬 '+(roundIdx+2)+'/'+st.rounds.length}</small></button>`:''}<button class="btn" id="againBtn">다시 하기</button><button class="btn" id="homeBtn">단계 선택</button></div>`;
     panel.querySelectorAll('[data-icon]').forEach(cv=>iconCanvas(cv,cv.dataset.icon));
     const nb=panel.querySelector('#nextBtn');
     if(nb)nb.onclick=()=>{if(!last)roundIdx++;else{stageIdx=stageIdx<STAGES.length-1?stageIdx+1:0;roundIdx=0;}state='ready';updateTop();renderPlay();};
@@ -784,12 +785,12 @@ function infTap(){if(!inf||inf.over)return;const now=ac.currentTime;drum(now,210
   const r=inf.events.find(e=>e.rest&&!e.res&&now>e.t+0.06&&now<e.end-0.06);
   if(r){r.res='broke';infHurt('쉼표예요!');return;}
   inf.score=Math.max(0,inf.score-50);infHurt('헛박!');}
-function infHurt(msg){inf.hurtAt=ac.currentTime;inf.combo=0;inf.hearts--;judgeShow(msg+' ♥ -1','#FF8A96');if(inf.hearts<=0)infEnd();}
-function infTick(now){if(!inf||inf.over)return;
+function infHurt(msg,t){inf.hurtAt=ac.currentTime;inf.combo=0;inf.hearts--;judgeShow(msg+' ♥ -1','#FF8A96');if(inf.hearts<=0)infEnd(t);}
+function infTick(now){if(!inf||inf.over)return;if(inf.lastTick&&now-inf.lastTick>1){infEnd(inf.lastTick);return;}inf.lastTick=now;
   while(inf.bars[inf.bars.length-1].start<now+8)infAddBar();
   while(infTimeOfBeat(inf.nextClick)<now+0.25){const b=inf.nextClick;if(b<0||save.metro)click(infTimeOfBeat(b),((b%4)+4)%4===0,b<0?1:0.55);inf.nextClick++;}
   for(const e of inf.events){if(e.t>now)break;if(e.res)continue;
-    if(!e.rest&&now>e.t+GOOD){e.res='miss';infHurt('놓쳤어요');if(inf.over)return;}
+    if(!e.rest&&now>e.t+GOOD){e.res='miss';infHurt('놓쳤어요',e.t+GOOD);if(inf.over)return;}
     else if(e.rest&&now>e.end-0.06){e.res='keep';}}
   const cur=infBeatAt(now),bar=Math.floor(cur/4),co=document.getElementById('callout');
   let html='';if(cur<0)html=`<b>${Math.floor(cur)+5}</b><span>무한 음표 시작!</span>`;
@@ -798,7 +799,7 @@ function infTick(now){if(!inf||inf.over)return;
   document.getElementById('phase').textContent=`${'♥'.repeat(Math.max(0,inf.hearts))}${'♡'.repeat(3-Math.max(0,inf.hearts))} · ${Math.max(0,bar)+1}마디 · ♩=${INF_BPM(Math.max(0,bar))} · ${inf.score.toLocaleString()}점`;
   const keep=inf.events.findIndex(e=>e.end>now-3);if(keep>40){inf.events.splice(0,keep);}
 }
-function infEnd(){inf.over=true;const now=ac.currentTime,bars=Math.max(0,Math.floor(infBeatAt(now)/4));inf.result={bars,bpm:INF_BPM(bars),score:inf.score,maxCombo:inf.maxCombo};
+function infEnd(at){inf.over=true;const now=ac.currentTime,bars=Math.max(0,Math.floor(infBeatAt(Math.min(now,at||now))/4));inf.result={bars,bpm:INF_BPM(bars),score:inf.score,maxCombo:inf.maxCombo};
   const rec=bars>save.infBest.bars||inf.score>save.infBest.score;inf.result.record=rec;
   save.infBest={bars:Math.max(save.infBest.bars,bars),score:Math.max(save.infBest.score,inf.score)};
   const coins=bars*2+Math.floor(inf.score/500);inf.result.coins=coins;save.coins+=coins;persist();
@@ -873,6 +874,7 @@ updateTop();renderPlay();
 function refreshAll(){if(master)master.gain.value=save.sound?1:0;document.getElementById('soundBtn').textContent=save.sound?'♪ 소리 켬':'♪ 소리 끔';
   if(state==='run'||state==='inf')return;stageIdx=Math.min(stageIdx,STAGES.length-1);if(!stageOpen(stageIdx)){stageIdx=0;roundIdx=0;}if(state!=='home'){state='home';run=null;inf=null;}
   updateTop();renderPlay();if(!document.getElementById('panelRoom').hidden)renderRoom();if(!document.getElementById('panelBook').hidden)renderBook();}
+function takeServer(sv){applySave(sv);try{localStorage.setItem(ukey(me.nick),JSON.stringify(save));}catch(e){}setSync('ok');lastDraw=null;refreshAll();}
 function openAcc(){if(AA)AA.open({game:'beat',gameName:'숲속 박자 음악회',color:'#FFD25A',onPlay:()=>{}});}
 function setUser(a){
   const gate=document.getElementById('gate');
@@ -886,8 +888,8 @@ function setUser(a){
   const who=me;
   api({action:'load',nick:a.nick,pin:a.pin}).then(j=>{if(me!==who)return;
     if(!j.ok){if(['PIN','NOUSER','BLOCKED'].includes(j.code)){AA.logout();return;}setSync('off');if(local){dirty=true;}return;}
-    const sv=j.data;
-    if(sv&&(!local||(sv.t||0)>=(local.t||0))){applySave(sv);try{localStorage.setItem(ukey(a.nick),JSON.stringify(save));}catch(e){}setSync('ok');refreshAll();}
+    const sv=j.data,sr=(sv&&sv.rev)||0,lr=(local&&local.rev)||0;
+    if(sv&&(sr>lr||(!local||(sv.t||0)>=(local.t||0)))){takeServer(sv);}
     else if(local){dirty=true;push();}else setSync('ok');
   }).catch(()=>{if(me===who){if(local)dirty=true;setSync('off');}});}
 if(AA){document.getElementById('gateBtn').onclick=openAcc;AA.onChange(setUser);const a0=AA.get();if(a0){setUser(a0);AA.refresh();}else{document.getElementById('gate').hidden=false;openAcc();}}
